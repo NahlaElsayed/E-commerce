@@ -1,4 +1,4 @@
-const strip = require("stripe")(process.env.STRIPE_SECERT);
+const stripe = require("stripe")(process.env.STRIPE_SECERT);
 const asyncHandler = require("express-async-handler");
 const ApiError = require("../utils/apiError");
 const fatory = require("./handlersFactory");
@@ -126,7 +126,7 @@ exports.checkoutSession = asyncHandler(async (req, res, next) => {
     : cart.totalCartPrice;
   const TotalOrderPrice = cartPrice + taxPrice + shippingPrice;
   // 3)create stripe checkout session
-  const session = await strip.checkout.sessions.create({
+  const session = await stripe.checkout.sessions.create({
     line_items: [
       // name: req.user.name,
       // amount: TotalOrderPrice * 100,
@@ -152,4 +152,23 @@ exports.checkoutSession = asyncHandler(async (req, res, next) => {
   });
   // 4) send session to response
   res.status(200).json({ satuts: "success", session });
+});
+
+exports.webhookCheckout = asyncHandler(async (req, res, next) => {
+  const sig = req.headers["stripe-signature"];
+
+  let event;
+
+  try {
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECERT
+    );
+  } catch (err) {
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+  if (event.type === "checkout.session.completed") {
+    console.log("create order here...........");
+  }
 });

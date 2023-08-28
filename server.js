@@ -3,16 +3,15 @@ const path = require("path");
 const express = require("express");
 const dotenv = require("dotenv");
 const morgan = require("morgan");
-const cors = require('cors')
-const compression = require('compression')
-
+const cors = require("cors");
+const compression = require("compression");
 
 dotenv.config({ path: "config.env" });
 
 const ApiError = require("./utils/apiError");
 const globalError = require("./middlewares/errorMiddleware");
 const dbConnection = require("./config/database");
-
+const {webhookCheckout} =require('./services/orderService')
 const mountRouts = require("./routes");
 
 // Connect with db
@@ -20,11 +19,17 @@ dbConnection();
 
 // express app
 const app = express();
-// enable other domain to access your application 
-app.use(cors())
-app.options('*', cors())
+
+// enable other domain to access your application
+app.use(cors());
+app.options("*", cors());
+
 // compress all response
-app.use(compression())
+app.use(compression());
+
+// checkout webhook
+app.post("/webhook-checkout", express.raw({ type: "application/json" }),webhookCheckout);
+
 // Middlewares
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "uploads")));
