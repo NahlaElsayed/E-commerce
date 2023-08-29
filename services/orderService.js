@@ -5,6 +5,7 @@ const fatory = require("./handlersFactory");
 const Order = require("../models/orderModel");
 const Cart = require("../models/cartModel");
 const Product = require("../models/productModel");
+const User = require("../models/userModel");
 
 // @desc    create cash order
 // @route   post /api/v1/orders/cartId
@@ -154,6 +155,39 @@ exports.checkoutSession = asyncHandler(async (req, res, next) => {
   res.status(200).json({ satuts: "success", session });
 });
 
+const createCardOrder = async (session) => {
+  const cartId = session.client_reference_id;
+  const shippingAddress = session.metadata;
+  const orderPrice = session.display_items[0].amount / 100;
+  const cart = await Cart.findById(cartId);
+  const user = await User.findOne({ email: session.customer_email });
+
+  // 3)create order with default payment card
+  const order = await Order.create({
+    user: user._id,
+    cartItems: cart.cartItems,
+    shippingAddress,
+    TotalOrderPrice: orderPrice,
+    isPaid: true,
+    PaidAt: Date.now(),
+    paymentMethodType: "card",
+  });
+  // 4)after creating order ,decrement product quantity,increment product sold
+  if (order) {
+    const bulkOptions = cart.cartItems.map((item) => ({
+      updateOne: {
+        filter: { _id: item.product },
+        update: { $inc: { quantity: -item.quantity, sold: +item.quantity } },
+      },
+    }));
+    await Product.bulkWrite(bulkOptions, {});
+    // 5)clear cart depend on cartId
+    await Cart.findByIdAndDelete(cartId);
+  }
+};
+// @desc    this webhook will run stripe payment successfuly paid
+// @route   pos /webhook-checkout
+// @access  protected (user)
 exports.webhookCheckout = asyncHandler(async (req, res, next) => {
   const sig = req.headers["stripe-signature"];
 
@@ -169,7 +203,7 @@ exports.webhookCheckout = asyncHandler(async (req, res, next) => {
     return res.status(400).send(`Webhook Error: ${err.message}`);
   }
   if (event.type === "checkout.session.completed") {
-    console.log("create order here...........");
-    console.log(event.data.object.client_reference_id)
+    createCardOrder(event.data.object);
   }
+  res.satuts(200).json({ received: true });
 });
