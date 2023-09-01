@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const ApiError = require("../utils/apiError");
 const User = require("../models/userModel");
 const sendEmail = require("../utils/sendEmail");
+const {sanitizeUser}=require("../utils/snatizeData")
 
 const createToken = (payload) =>
 jwt.sign({ userId: payload }, process.env.JWT_SECRET_KEY, {
@@ -23,7 +24,7 @@ exports.singUp = asyncHandler(async (req, res, next) => {
   });
   // 2)genrate token
   const token = createToken(user._id);
-  res.status(201).json({ data: user, token });
+  res.status(201).json({ data: sanitizeUser(user), token });
 });
 
 // @desc    login
